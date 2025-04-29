@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Students List</h2>
+        <div class="d-flex align-items-center">
+            <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#sectionModal">
+                <i class="fas fa-plus"></i> New Section
+            </button>
+            {% for section in sections %}
+            <form action="{{ url_for('delete_section', section_id=section.id) }}" method="POST" style="display: inline;" class="me-2" onsubmit="return confirm('Are you sure you want to delete {{ section.name }}? This will also remove all students in this section.');">
+                <button type="submit" class="btn btn-danger btn-sm">
+                    <i class="fas fa-trash"></i> {{ section.name }}
+                </button>
+            </form>
+            {% endfor %}
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importModal">
+                <i class="fas fa-file-import"></i> Import Students
+            </button>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col">
+            <select class="form-select" id="sectionFilter">
+                <option value="">All Sections</option>
+                {% for section in sections %}
+                <option value="{{ section.id }}">{{ section.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr id="tableHeader">
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Section</th>
+                    <th>Date Added</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr data-section-id="{{ student.section.id if student.section else '' }}">
+                    <td>{{ student.student_id }}</td>
+                    <td>{{ student.name }}</td>
+                    <td>
+                        <span data-section-id="{{ student.section.id if student.section else '' }}">
+                            {{ student.section.name if student.section else 'No Section' }}
+                        </span>
+                        {% if student.section and student.section.quizzes %}
+                        <button class="btn btn-info btn-sm ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#quizzes-{{ student.id }}">
+                            <i class="fas fa-list"></i> Quizzes ({{ student.section.quizzes|length }})
+                        </button>
+                        <div class="collapse mt-2" id="quizzes-{{ student.id }}">
+                            <div class="card card-body">
+                                <h6>Assigned Quizzes for {{ student.section.name }}:</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Title</th>
+                                                <th>Items</th>
+                                                <th>Created</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for quiz in student.section.quizzes %}
+                                            <tr>
+                                                <td>{{ quiz.title }}</td>
+                                                <td>{{ quiz.num_items }}</td>
+                                                <td>{{ quiz.created_at.strftime('%Y-%m-%d') }}</td>
+                                                <td>
+                                                    <a href="{{ url_for('download_personalized_template', quiz_id=quiz.id, student_id=student.id) }}" 
+                                                       class="btn btn-sm btn-primary">
+                                                        <i class="fas fa-download"></i> Personal
+                                                    </a>
+                                                    <a href="{{ url_for('download_template', template_type='standard_20' if quiz.num_items == 20 else 'extended_50' if quiz.num_items == 50 else 'comprehensive_100') }}" 
+                                                       class="btn btn-sm btn-secondary">
+                                                        <i class="fas fa-download"></i> Template
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>{{ student.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>
+                        <form action="{{ url_for('delete_student', student_id=student.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this student?');">
+                            <button type="submit" class="btn btn-danger btn-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Students</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('student_list') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Section</label>
+                        <select name="section_id" class="form-select" required>
+                            {% for section in sections %}
+                            <option value="{{ section.id }}">{{ section.name }}</option>
+                            {% endfor %}
+                        </select>
+
+
+                    </div>
+                    <div class="mb-3">
+                        <label for="file" class="form-label">CSV File</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+                    </div>
+                    <div class="mb-3">
+                        <h6>CSV Format Example:</h6>
+                        <pre class="bg-dark text-light p-2 rounded">Name,Student ID
+"SMITH, JOHN DOE",20220001
+"DOE, JANE SMITH",20220002</pre>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Import</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section Modal -->
+<div class="modal fade" id="sectionModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create New Section</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('create_section') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="sectionName" class="form-label">Section Name</label>
+                        <input type="text" class="form-control" id="sectionName" name="name" required>
+                    </div>
+                    <button type="submit" class="btn btn-success">Create Section</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function filterStudents() {
+    const filter = document.getElementById('sectionFilter').value;
+    const rows = document.querySelectorAll('tbody tr');
+    const headerRow = document.getElementById('tableHeader');
+
+    // Get unique sections
+    const sections = new Set();
+    rows.forEach(row => {
+        const sectionCell = row.querySelector('td:nth-child(3) span');
+        if (!sectionCell) return;
+        sections.add(sectionCell.textContent.trim());
+    });
+
+    rows.forEach(row => {
+        const sectionCell = row.querySelector('td:nth-child(3) span');
+        if (!sectionCell) return;
+
+        const sectionId = sectionCell.getAttribute('data-section-id');
+        const sectionName = sectionCell.textContent.trim();
+        const quizContainer = row.querySelector('.collapse');
+
+        if (filter === '') {
+            // Update header to show only Section column
+            headerRow.querySelectorAll('th').forEach((th, index) => {
+                if (index !== 2) { // Hide all columns except section column
+                    th.style.display = 'none';
+                }
+            });
+
+            // Only show one row per section when All Sections is selected
+            if (sections.has(sectionName)) {
+                sections.delete(sectionName); // Remove to avoid duplicates
+                row.style.display = '';
+                row.querySelectorAll('td').forEach((td, index) => {
+                    if (index !== 2) { // Hide all columns except section column
+                        td.style.display = 'none';
+                    }
+                });
+                if (quizContainer) {
+                    quizContainer.style.display = 'none';
+                }
+            } else {
+                row.style.display = 'none';
+            }
+        } else {
+            // Show all header columns when a section is selected
+            headerRow.querySelectorAll('th').forEach(th => {
+                th.style.display = '';
+            });
+
+            // Show student info and quiz buttons for selected section
+            row.querySelectorAll('td').forEach(td => {
+                td.style.display = '';
+            });
+            const shouldShow = sectionId === filter;
+            row.style.display = shouldShow ? '' : 'none';
+            if (quizContainer) {
+                quizContainer.style.display = '';
+                if (shouldShow) {
+                    quizContainer.classList.add('show');
+                }
+            }
+        }
+    });
+}
+
+function showQuizzes(sectionId) {
+    const rows = document.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        const quizContainer = row.querySelector('.collapse');
+        if (quizContainer) {
+            quizContainer.classList.add('show');
+        }
+    });
+}
+
+function getQuizzesForSection(sectionId) {
+    if (!sectionId) return '';
+    const section = document.querySelector(`[data-section-id="${sectionId}"]`);
+    if (!section) return '';
+    const quizTable = section.querySelector('.table');
+    return quizTable?.querySelector('tbody')?.innerHTML || '';
+}
+
+// Initialize filter on page load
+document.addEventListener('DOMContentLoaded', function() {
+    filterStudents();
+    document.getElementById('sectionFilter').addEventListener('change', filterStudents);
+});
+</script>
+{% endblock %}
